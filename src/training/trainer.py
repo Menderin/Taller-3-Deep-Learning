@@ -10,6 +10,7 @@ import torch
 from torch import nn
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 
 from src.training.losses import MultiTaskLoss
 
@@ -47,8 +48,18 @@ class MultiTaskTrainer:
 
         for epoch in range(1, epochs + 1):
             epoch_start = time.perf_counter()
-            train_losses = self._run_epoch(train_loader, training=True)
-            val_losses = self._run_epoch(val_loader, training=False)
+            train_losses = self._run_epoch(
+                train_loader,
+                training=True,
+                epoch=epoch,
+                epochs=epochs,
+            )
+            val_losses = self._run_epoch(
+                val_loader,
+                training=False,
+                epoch=epoch,
+                epochs=epochs,
+            )
             epoch_seconds = time.perf_counter() - epoch_start
 
             row = {
@@ -88,7 +99,13 @@ class MultiTaskTrainer:
         self.model.load_state_dict(checkpoint["model_state_dict"])
         return checkpoint
 
-    def _run_epoch(self, loader: DataLoader, training: bool) -> dict[str, float]:
+    def _run_epoch(
+        self,
+        loader: DataLoader,
+        training: bool,
+        epoch: int,
+        epochs: int,
+    ) -> dict[str, float]:
         if training:
             self.model.train()
         else:
@@ -99,7 +116,14 @@ class MultiTaskTrainer:
 
         context = torch.enable_grad() if training else torch.no_grad()
         with context:
-            for images, gender_targets, age_targets in loader:
+            phase = "train" if training else "val"
+            progress = tqdm(
+                loader,
+                desc=f"{phase} epoch {epoch:02d}/{epochs:02d}",
+                leave=False,
+                dynamic_ncols=True,
+            )
+            for images, gender_targets, age_targets in progress:
                 images = images.to(self.device)
                 gender_targets = gender_targets.to(self.device)
                 age_targets = age_targets.to(self.device)
@@ -124,6 +148,11 @@ class MultiTaskTrainer:
                 totals["total_loss"] += losses.total.item() * batch_size
                 totals["gender_loss"] += losses.gender.item() * batch_size
                 totals["age_loss"] += losses.age.item() * batch_size
+                progress.set_postfix(
+                    loss=f"{totals['total_loss'] / sample_count:.4f}",
+                    gender=f"{totals['gender_loss'] / sample_count:.4f}",
+                    age=f"{totals['age_loss'] / sample_count:.4f}",
+                )
 
         if sample_count == 0:
             raise RuntimeError("El DataLoader no contiene muestras.")
