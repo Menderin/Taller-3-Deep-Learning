@@ -9,6 +9,7 @@ from torch import nn, optim
 from src.config import AppConfig
 from src.data.datamodule import UTKFaceDataModule
 from src.evaluation.metrics import MultiTaskEvaluator
+from src.evaluation.artifacts import ExperimentArtifactWriter
 from src.evaluation.plots import ResultPlotter
 from src.evaluation.reporter import ExperimentResult, ExperimentStatus
 from src.models.cnn import MultiTaskCNN
@@ -153,6 +154,10 @@ class ExperimentRunner:
         self.device = device
         self.catalog = catalog
         self.plotter = ResultPlotter(config.plots_dir)
+        self.artifact_writer = ExperimentArtifactWriter(
+            config.experiments_dir,
+            config.reports_dir,
+        )
 
     def run(self, selected_names: set[str]) -> list[ExperimentResult]:
         unknown = selected_names.difference(self.catalog)
@@ -160,16 +165,35 @@ class ExperimentRunner:
             raise ValueError(f"Experimentos desconocidos: {', '.join(sorted(unknown))}")
 
         results: list[ExperimentResult] = []
+        self.artifact_writer.start_run(selected_names)
         for spec in self.catalog.values():
             if not spec.implemented:
                 results.append(self._not_implemented_result(spec))
             elif spec.name not in selected_names:
                 results.append(self._not_executed_result(spec))
             else:
-                results.append(self._run_spec(spec))
+                result = self._run_spec(spec)
+                results.append(result)
+                self.artifact_writer.write_result(result)
+                self.artifact_writer.update_run(selected_names, results)
 
         for strategy_id in ("E1", "E2", "E3", "E4", "E5"):
             self.plotter.plot_ablation_comparison(results, strategy_id)
+        self.plotter.plot_global_comparison(results)
+        final_status = (
+            "COMPLETED"
+            if all(
+                result.status == ExperimentStatus.COMPLETED
+                for result in results
+                if result.experiment_name in selected_names
+            )
+            else "COMPLETED_WITH_ERRORS"
+        )
+        self.artifact_writer.update_run(
+            selected_names,
+            results,
+            status=final_status,
+        )
         return results
 
     def _run_spec(self, spec: ExperimentSpec) -> ExperimentResult:
@@ -220,9 +244,17 @@ class ExperimentRunner:
 
             evaluator = MultiTaskEvaluator(self.device)
             evaluation = evaluator.evaluate(model, data_module.test_dataloader())
+            self.artifact_writer.write_history(spec.name, history)
+            self.artifact_writer.write_evaluation(
+                spec.name,
+                evaluation,
+                sample_names=data_module.test_sample_names(),
+            )
             self.plotter.plot_training_history(history, spec.name)
             self.plotter.plot_confusion_matrix(evaluation, spec.name)
             self.plotter.plot_age_predictions(evaluation, spec.name)
+            self.plotter.plot_age_residuals(evaluation, spec.name)
+            self.plotter.plot_age_range_errors(evaluation, spec.name)
 
             sizes = data_module.split_sizes()
             metrics = dict(evaluation.metrics)
@@ -318,18 +350,32 @@ class ExperimentRunner:
             print("Evaluando en test...")
             gender_preds, age_preds = model.predict(X_test)
             
-            # Use MultiTaskEvaluator logic manually or create dummy evaluation
-            from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, mean_absolute_error, mean_squared_error, r2_score
-            metrics = {
-                "gender_accuracy": float(accuracy_score(y_g_test, gender_preds)),
-                "gender_precision": float(precision_score(y_g_test, gender_preds, average="weighted", zero_division=0)),
-                "gender_recall": float(recall_score(y_g_test, gender_preds, average="weighted", zero_division=0)),
-                "gender_f1": float(f1_score(y_g_test, gender_preds, average="weighted", zero_division=0)),
-                "age_mae": float(mean_absolute_error(y_a_test, age_preds)),
-                "age_rmse": float(np.sqrt(mean_squared_error(y_a_test, age_preds))),
-                "age_r2": float(r2_score(y_a_test, age_preds)),
-                "samples": int(len(y_g_test)),
-            }
+            from src.evaluation.metrics import MultiTaskMetrics
+
+            evaluation = MultiTaskMetrics.calculate(
+                gender_targets=torch.as_tensor(y_g_test),
+                gender_predictions=torch.as_tensor(gender_preds),
+                age_targets=torch.as_tensor(y_a_test),
+                age_predictions=torch.as_tensor(age_preds),
+            )
+            metrics = dict(evaluation.metrics)
+
+            checkpoint_path = (
+                self.config.checkpoints_dir / spec.name / "best_model.joblib"
+            )
+            checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            from joblib import dump
+
+            dump(model, checkpoint_path)
+            self.artifact_writer.write_evaluation(
+                spec.name,
+                evaluation,
+                sample_names=data_module.test_sample_names(),
+            )
+            self.plotter.plot_confusion_matrix(evaluation, spec.name)
+            self.plotter.plot_age_predictions(evaluation, spec.name)
+            self.plotter.plot_age_residuals(evaluation, spec.name)
+            self.plotter.plot_age_range_errors(evaluation, spec.name)
             
             sizes = data_module.split_sizes()
             metrics.update({
@@ -348,7 +394,7 @@ class ExperimentRunner:
                 metrics=metrics,
                 trainable_parameters=0,
                 training_seconds=training_seconds,
-                checkpoint="",
+                checkpoint=str(checkpoint_path),
                 message="",
             )
         except Exception as error:

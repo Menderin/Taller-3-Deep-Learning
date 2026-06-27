@@ -115,6 +115,16 @@ class MetricsReporter:
         output_paths.append(environment_path)
         return output_paths
 
+    def write_run_metadata(self, metadata: dict[str, Any]) -> Path:
+        """Persist the effective configuration without copying environment secrets."""
+
+        output_path = self.reports_dir / "run_metadata.json"
+        output_path.write_text(
+            json.dumps(metadata, indent=2, default=str),
+            encoding="utf-8",
+        )
+        return output_path
+
     def _write_table(
         self,
         results: list[ExperimentResult],

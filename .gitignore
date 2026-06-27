@@ -13,10 +13,12 @@ artifacts/checkpoints/*
 artifacts/reports/*
 artifacts/plots/*
 artifacts/splits/*
+artifacts/experiments/*
 
 # Keep generated directories in the repository
 !artifacts/checkpoints/.gitkeep
 !artifacts/reports/.gitkeep
 !artifacts/plots/.gitkeep
 !artifacts/splits/.gitkeep
+!artifacts/experiments/.gitkeep
 Laboratorio_03_Guia_Uso_Codigo.tex

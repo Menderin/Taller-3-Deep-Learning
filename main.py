@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
+from datetime import datetime, timezone
 import sys
+from pathlib import Path
 
 from src.config import AppConfig
 from src.evaluation.reporter import ExperimentStatus, MetricsReporter
@@ -95,10 +98,23 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Device: {device}")
     print(f"Dataset: {config.dataset_dir}")
 
+    reporter = MetricsReporter(config.reports_dir)
+    config_snapshot = {
+        key: str(value) if isinstance(value, Path) else value
+        for key, value in asdict(config).items()
+    }
+    reporter.write_run_metadata(
+        {
+            "started_at_utc": datetime.now(timezone.utc).isoformat(),
+            "selected_experiments": sorted(selected_names),
+            "configuration": config_snapshot,
+            "environment": collect_environment_info(device),
+        }
+    )
+
     runner = ExperimentRunner(config=config, device=device, catalog=catalog)
     results = runner.run(selected_names)
 
-    reporter = MetricsReporter(config.reports_dir)
     report_paths = reporter.write_all(results, collect_environment_info(device))
     print_results(results)
     print(f"\nReportes generados en: {config.reports_dir}")

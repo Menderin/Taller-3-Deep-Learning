@@ -62,6 +62,10 @@ class UTKFaceDataModule:
             "test": len(self._require_dataset(self.test_dataset, "test")),
         }
 
+    def test_sample_names(self) -> list[str]:
+        dataset = self._require_dataset(self.test_dataset, "test")
+        return [record.path.name for record in dataset.records]
+
     def _discover_records(self) -> list[UTKFaceRecord]:
         if not self.config.dataset_dir.exists():
             raise FileNotFoundError(

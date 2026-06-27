@@ -241,6 +241,14 @@ confusión. Las métricas de edad son MAE, RMSE, R² y MAE por rango etario.
 También se registran parámetros entrenables, tiempo de entrenamiento, curvas
 de pérdida y gráfico de edad real versus predicha.
 
+Cada experimento completado conserva además sus predicciones individuales,
+métricas, matriz de confusión e historial de entrenamiento en
+`artifacts/experiments/<nombre>/`. Los gráficos incluyen residuos y MAE por
+rango etario, comparaciones globales, compromiso entre tareas y costo
+computacional. `artifacts/reports/run_progress.json` se actualiza después de
+cada experimento para no perder los resultados ya terminados si la ejecución
+se interrumpe.
+
 ## Aplicación Streamlit
 
 Primero entrena `cnn_base` o configura `CNN_CHECKPOINT` en `.env` para apuntar

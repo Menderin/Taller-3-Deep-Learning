@@ -70,6 +70,10 @@ class AppConfig:
     def splits_dir(self) -> Path:
         return self.artifacts_dir / "splits"
 
+    @property
+    def experiments_dir(self) -> Path:
+        return self.artifacts_dir / "experiments"
+
     @classmethod
     def from_env(cls, env_file: str | Path = ".env") -> "AppConfig":
         """Build the configuration after reading the optional .env file."""
@@ -136,5 +140,6 @@ class AppConfig:
             self.reports_dir,
             self.plots_dir,
             self.splits_dir,
+            self.experiments_dir,
         ):
             path.mkdir(parents=True, exist_ok=True)
