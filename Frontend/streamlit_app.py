@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import csv
 from pathlib import Path
+import sys
 
 from PIL import Image
 import streamlit as st
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import AppConfig
 from src.inference.face_detector import FaceDetector
@@ -220,3 +226,7 @@ def render_analytics_page() -> None:
     plot_tradeoff = plots_dir / "global_multitask_tradeoff.png"
     if plot_tradeoff.exists():
         st.image(Image.open(plot_tradeoff), caption="Tradeoff Multitarea", use_container_width=True)
+
+
+if __name__ == "__main__":
+    run_app()
