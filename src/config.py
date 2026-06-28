@@ -49,6 +49,7 @@ class AppConfig:
     weight_decay: float = 1e-4
     lambda_age: float = 0.01
     num_workers: int = 0
+    cpu_threads: int = 4
     max_images: int = 0
     device: str = "auto"
     train_fraction: float = 0.70
@@ -86,7 +87,7 @@ class AppConfig:
         checkpoint = Path(
             os.getenv(
                 "CNN_CHECKPOINT",
-                "artifacts/checkpoints/cnn_base/best_model.pt",
+                "Frontend/models/best_model.pt",
             )
         ).expanduser()
 
@@ -110,6 +111,7 @@ class AppConfig:
             weight_decay=_as_float("WEIGHT_DECAY", 1e-4),
             lambda_age=_as_float("LAMBDA_AGE", 0.01),
             num_workers=_as_int("NUM_WORKERS", 0),
+            cpu_threads=_as_int("CPU_THREADS", 4),
             max_images=_as_int("MAX_IMAGES", 0),
             device=os.getenv("DEVICE", "auto").lower(),
         )
@@ -127,6 +129,8 @@ class AppConfig:
             raise ValueError("EPOCHS debe ser mayor que cero.")
         if self.max_images < 0:
             raise ValueError("MAX_IMAGES no puede ser negativo.")
+        if self.cpu_threads <= 0:
+            raise ValueError("CPU_THREADS debe ser mayor que cero.")
         if self.train_fraction + self.val_fraction >= 1.0:
             raise ValueError("Las fracciones de train y validacion deben dejar datos para test.")
         if self.device not in {"auto", "cpu", "cuda", "mps"}:

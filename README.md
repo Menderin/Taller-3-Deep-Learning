@@ -25,6 +25,8 @@ ejecutarse y compararse con el mismo protocolo.
 ├── requirements.txt
 ├── main.py
 ├── Frontend/
+│   ├── __init__.py
+│   ├── streamlit_app.py
 │   └── streamlit_main.py
 ├── src/
 │   ├── config.py
@@ -51,8 +53,7 @@ ejecutarse y compararse con el mismo protocolo.
 │   │   └── reporter.py
 │   └── inference/
 │       ├── face_detector.py
-│       ├── predictor.py
-│       └── streamlit_app.py
+│       └── predictor.py
 ├── tests/
 └── artifacts/
     ├── checkpoints/
@@ -67,12 +68,13 @@ ejecutarse y compararse con el mismo protocolo.
 |---|---|
 | `main.py` | Orquestar entrenamiento, evaluación y reportes. |
 | `Frontend/streamlit_main.py` | Orquestar la aplicación de inferencia. |
+| `Frontend/streamlit_app.py` | Renderizar la interfaz web de Streamlit. |
 | `src/config.py` | Leer `.env` y centralizar hiperparámetros. |
 | `src/data/` | Leer UTKFace, extraer etiquetas y crear particiones reproducibles. |
 | `src/models/cnn.py` | Implementar la CNN multitarea entregada. |
 | `src/training/` | Ejecutar el ciclo manual de entrenamiento con PyTorch. |
 | `src/evaluation/` | Calcular métricas, generar gráficos y exportar reportes. |
-| `src/inference/` | Detectar rostros y usar el checkpoint de la CNN. |
+| `src/inference/` | Detectar rostros y ejecutar checkpoints entrenados. |
 
 No se usa PyTorch Lightning. El ciclo de entrenamiento muestra directamente
 `zero_grad`, `backward` y `step` para que el flujo de PyTorch sea observable.
@@ -262,6 +264,19 @@ streamlit run Frontend/streamlit_main.py
 La aplicación permite subir una imagen o capturarla con la cámara, detecta la
 cara más grande mediante OpenCV, aplica el preprocesamiento de evaluación y
 muestra género, confianza y edad estimada.
+
+### Despliegue en Streamlit Community Cloud
+
+La carpeta `Frontend/` contiene el checkpoint seleccionado, los recursos
+visuales y un archivo de dependencias mínimo para desplegar la aplicación sin
+el dataset ni los artefactos completos de entrenamiento.
+
+1. Publicar el repositorio en GitHub.
+2. Crear una aplicación en `https://share.streamlit.io`.
+3. Seleccionar este repositorio y la rama principal.
+4. Usar `Frontend/streamlit_main.py` como entrypoint.
+5. En opciones avanzadas, seleccionar Python 3.10.
+6. Desplegar. No se requieren secretos para esta versión.
 
 ## Trabajo pendiente para los alumnos
 

@@ -4,7 +4,7 @@ Run with:
     streamlit run Frontend/streamlit_main.py
 """
 
-from src.inference.streamlit_app import run_app
+from Frontend.streamlit_app import run_app
 
 
 if __name__ == "__main__":

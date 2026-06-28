@@ -1,0 +1,556 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage[table]{xcolor}
+\usepackage{svg}
+\usepackage[font=footnotesize]{caption}
+\usepackage{subcaption}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\addto\captionsspanish{\renewcommand{\tablename}{Tabla}}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage[
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=blue
+]{hyperref}
+
+\hypersetup{
+    pdftitle={Clasificacion de genero y estimacion de edad en UTKFace},
+    pdfauthor={Victor Jopia y Kevin Silva}
+}
+\setlist[itemize]{nosep}
+\setlist[enumerate]{nosep}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.12}
+
+\newcommand{\todo}[1]{%
+    \fcolorbox{orange!70!black}{orange!8}{%
+        \parbox{0.94\linewidth}{\textbf{Pendiente:} #1}%
+    }%
+}
+\newcommand{\best}[1]{\textbf{#1}}
+
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    frame=single,
+    breaklines=true,
+    breakatwhitespace=false,
+    columns=fullflexible,
+    keepspaces=true,
+    showstringspaces=false,
+    postbreak=\mbox{\textcolor{gray}{$\hookrightarrow$}\space},
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{teal},
+    numbers=left,
+    numberstyle=\tiny,
+    captionpos=b
+}
+\renewcommand{\lstlistingname}{Código}
+\captionsetup[table]{skip=10pt}
+
+\title{Laboratorio 03: Clasificación de Género y Estimación de Edad con Redes Convolucionales \\
+\vspace{0.5em} \huge \textbf{Asignatura}: \textit{Deep Learning} (2026-01)\\
+\vspace{0.5em} \large \textbf{Profesor}: Dr. Juan Bekios Calfa}
+
+\author{
+\IEEEauthorblockN{1\textsuperscript{nd} Víctor Jopia}
+\IEEEauthorblockA{\textit{Escuela de Ingeniería} \\
+\textit{Universidad Católica del Norte}\\
+ITI\\
+\texttt{victor.jopia01@alumnos.ucn.cl}}
+\and
+\IEEEauthorblockN{2\textsuperscript{rd} Kevin Silva}
+\IEEEauthorblockA{\textit{Escuela de Ingeniería} \\
+\textit{Universidad Católica del Norte}\\
+ITI\\
+\texttt{kevin.silva@alumnos.ucn.cl}}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Este trabajo estudia simultáneamente la clasificación binaria de género y la
+estimación de edad a partir de imágenes faciales del conjunto UTKFace. Se
+compararon cinco estrategias bajo una partición y protocolo comunes: modelos
+clásicos con PCA, una red multicapa, una CNN simple, ResNet18 con extractor
+congelado y ResNet18 con ajuste fino. Además, se realizaron ablaciones sobre
+PCA, dropout, aumentación, tasa de aprendizaje, cantidad de bloques
+descongelados y ponderación de la pérdida de edad. Sobre 3.557 imágenes de
+prueba, el mejor resultado de género correspondió a ResNet18 con dos bloques
+descongelados, con accuracy y F1 de 0,9255. La mejor estimación de edad se
+obtuvo con ResNet18 y $\lambda_{\mathrm{edad}}=0{,}1$, con MAE de 5,85 años,
+RMSE de 8,20 y $R^2=0{,}8232$, manteniendo un accuracy de género de 0,9165.
+Los resultados muestran que el ajuste fino y el balance entre tareas son más
+determinantes que aumentar indiscriminadamente el número de parámetros. Se
+incluyó, finalmente, una aplicación Streamlit para ejecutar el modelo sobre
+imágenes nuevas.
+\end{abstract}
+
+\section{Introducción}
+
+La inferencia de atributos faciales es un problema útil para estudiar dos
+familias de aprendizaje supervisado sobre una misma entrada. El género
+anotado por UTKFace se formula como clasificación binaria, mientras que la
+edad se estima mediante regresión. Esta combinación permite analizar
+representaciones compartidas, objetivos potencialmente competitivos y
+diferencias entre modelos clásicos, redes densas, convoluciones y
+transferencia de aprendizaje.
+
+El objetivo general fue implementar y comparar estrategias de complejidad
+creciente bajo un protocolo justo y reproducible. Los objetivos específicos
+fueron: (i) preparar UTKFace y extraer sus etiquetas desde el nombre de
+archivo; (ii) entrenar cinco familias de modelos; (iii) medir por separado el
+desempeño de clasificación y regresión; (iv) estudiar componentes mediante
+ablaciones; y (v) desplegar el modelo seleccionado en una interfaz Streamlit.
+
+El alcance es experimental y educativo. Las etiquetas binarias representan
+las anotaciones del dataset, no la identidad de género de una persona. Los
+modelos pueden heredar sesgos demográficos y no son apropiados para decisiones
+de alto impacto. Se utilizaron Python, PyTorch, torchvision, scikit-learn,
+OpenCV y Streamlit.
+
+\section{Marco teórico}
+
+\textbf{Clasificación y regresión.} Para género, el modelo produce dos logits
+y se optimiza mediante entropía cruzada. La clase predicha corresponde al
+logit máximo. Para edad, el modelo produce un escalar continuo y se utiliza
+Smooth L1, menos sensible a errores extremos que el error cuadrático.
+
+\textbf{Aprendizaje multitarea.} Los modelos neuronales comparten una
+representación y poseen dos cabezas de salida. La pérdida total fue
+\begin{equation}
+    \mathcal{L} =
+    \mathcal{L}_{\mathrm{CE}}(g,\hat g)
+    + \lambda_{\mathrm{edad}}\,
+    \mathcal{L}_{\mathrm{SmoothL1}}(a,\hat a),
+\end{equation}
+donde $\lambda_{\mathrm{edad}}$ controla la importancia relativa de la
+regresión. Un valor pequeño puede relegar la edad; uno alto puede perjudicar
+la clasificación si ambas tareas compiten por la representación.
+
+\textbf{CNN y transferencia.} Las convoluciones explotan estructura espacial
+y comparten pesos, lo que reduce parámetros frente a una MLP aplicada a
+píxeles aplanados. ResNet introduce conexiones residuales que facilitan la
+optimización de redes profundas \cite{he2016resnet}. En transferencia de
+aprendizaje, una ResNet18 preentrenada en ImageNet se adapta a UTKFace
+congelando o descongelando parcialmente su extractor.
+
+\textbf{Métricas.} Género se evaluó con accuracy, precisión, recall y F1
+ponderados, además de matriz de confusión. Edad se evaluó con MAE, RMSE y
+$R^2$. MAE conserva una interpretación directa en años; RMSE penaliza más los
+errores grandes; $R^2$ mide la fracción de variabilidad explicada.
+
+\section{Metodología}
+
+\subsection{Dataset, etiquetas y partición}
+
+Se utilizó la versión \emph{Aligned \& Cropped Faces} de UTKFace
+\cite{zhang2017utkface}. El nombre de
+cada imagen sigue el patrón
+\texttt{edad\_genero\_raza\_fecha.jpg}; se usaron edad y género, donde 0
+corresponde a masculino y 1 a femenino según la codificación del dataset. Un
+parser descartó nombres que no cumplían el formato. Se retuvieron 23.705
+imágenes válidas y se aplicó una permutación determinista con semilla 42.
+
+\begin{table*}[!t]
+\centering
+\caption{Partición y distribución de las etiquetas utilizadas.}
+\label{tab:split}
+\small
+\begin{tabular}{lrrrrrrr}
+\toprule
+Conjunto & Total & Género 0 & Género 1 & 0--12 & 13--19 & 20--39 & 40+ \\
+\midrule
+Entrenamiento & 16.593 & 8.685 & 7.908 & 2.413 & 797 & 8.316 & 5.067 \\
+Validación    & 3.555  & 1.817 & 1.738 & 491   & 186 & 1.737 & 1.141 \\
+Prueba        & 3.557  & 1.889 & 1.668 & 509   & 197 & 1.827 & 1.024 \\
+\midrule
+Total         & 23.705 & 12.391 & 11.314 & 3.413 & 1.180 & 11.880 & 7.232 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+La partición fue 70\% entrenamiento, 15\% validación y 15\% prueba. No se
+realizó estratificación explícita; sin embargo, la distribución de género
+resultó relativamente equilibrada. La edad estuvo concentrada en 20--39 años,
+lo que se consideró al interpretar los errores por rango.
+
+\subsection{Preprocesamiento}
+
+Todas las imágenes se redimensionaron a $224\times224$ píxeles, se convirtieron
+a tensor RGB y se normalizaron con media y desviación estándar de ImageNet.
+La aumentación, aplicada exclusivamente en entrenamiento, consistió en volteo
+horizontal aleatorio ($p=0{,}5$) y variaciones leves de brillo, contraste y
+saturación ($0{,}1$). Validación, prueba e inferencia usaron transformaciones
+deterministas. Para el baseline clásico se convirtió cada imagen a escala de
+grises, se redujo a $64\times64$ y se aplanó.
+
+\subsection{Estrategias comparadas}
+
+\begin{table*}[!t]
+\centering
+\caption{Modelos y componentes principales.}
+\label{tab:modelos}
+\small
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+Estrategia & Implementación \\
+\midrule
+E1 Clásica & PCA compartido por dos pipelines; GaussianNB para género y Ridge
+para edad. Base con 100 componentes; ablaciones con 50 y 200. \\
+E2 MLP & Entrada RGB aplanada, capas $150.528\rightarrow512\rightarrow128$,
+ReLU, dropout y dos cabezas lineales. \\
+E3 CNN & Tres bloques Conv--ReLU--MaxPool (16, 32 y 64 canales), pooling
+adaptativo $4\times4$, capa compartida de 256 unidades y dos cabezas. \\
+E4 ResNet congelada & ResNet18 preentrenada con backbone congelado; se
+entrenaron únicamente las dos cabezas de 512 características. \\
+E5 ResNet fine-tuning & ResNet18 preentrenada con uno o dos bloques residuales
+finales descongelados, además de las cabezas multitarea. \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+\subsection{Entrenamiento y ablaciones}
+
+Los modelos neuronales se entrenaron por 10 épocas con Adam, batch de 32,
+weight decay $10^{-4}$ y checkpoint según la menor pérdida total de
+validación. La configuración general usó learning rate $10^{-3}$ y
+$\lambda_{\mathrm{edad}}=0{,}01$. Para fine-tuning se usó $10^{-4}$, con una
+ablación a $10^{-5}$. Las ablaciones modificaron un componente a la vez:
+dropout 0, ausencia de aumentación, $\lambda=0{,}001$,
+$\lambda=0{,}1$, número de componentes PCA y cantidad de bloques
+descongelados. En total se ejecutaron 20 configuraciones sobre el mismo split.
+
+La evaluación final se realizó sobre 3.557 ejemplos. Para edad también se
+calculó MAE en los rangos 0--12, 13--19, 20--39, 40--59 y 60+. Se registraron
+predicciones individuales, tiempos, parámetros entrenables, curvas,
+checkpoints y ambiente de ejecución.
+
+\section{Resultados}
+
+\subsection{Comparación de estrategias base}
+
+\begin{table*}[!t]
+\centering
+\caption{Resultados de las configuraciones base en test.}
+\label{tab:bases}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Modelo & Acc. & F1 & MAE & RMSE & $R^2$ & Parámetros \\
+\midrule
+PCA + clásicos       & 0,8094 & 0,8087 & 11,68 & 15,08 & 0,4026 & -- \\
+MLP multitarea       & 0,8580 & 0,8576 & 12,27 & 16,57 & 0,2786 & 77.136.899 \\
+CNN simple           & 0,8800 & 0,8798 & 9,43  & 12,98 & 0,5572 & 286.755 \\
+ResNet congelada     & 0,8395 & 0,8396 & 10,89 & 14,42 & 0,4538 & 1.539 \\
+ResNet fine-tuning   & 0,9114 & 0,9113 & 7,32  & 10,09 & 0,7322 & 8.395.267 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+La CNN superó a la línea clásica y a la MLP utilizando muchos menos
+parámetros que esta última. Congelar por completo ResNet18 no fue suficiente:
+su accuracy fue inferior a la CNN. En cambio, el ajuste fino elevó el accuracy
+base a 0,9114 y redujo el MAE a 7,32 años, mostrando que la adaptación de las
+representaciones preentrenadas al dominio facial fue decisiva.
+
+\begin{figure*}[!t]
+    \centering
+    \begin{subfigure}{0.49\linewidth}
+        \includegraphics[width=\linewidth]{images/global_gender_comparison.png}
+        \caption{Accuracy y F1 de género.}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.49\linewidth}
+        \includegraphics[width=\linewidth]{images/global_age_comparison.png}
+        \caption{MAE y RMSE de edad.}
+    \end{subfigure}
+    \caption{Comparación de las 20 configuraciones evaluadas.}
+    \label{fig:comparacion-global}
+\end{figure*}
+
+\subsection{Efecto de las ablaciones}
+
+\begin{table*}[!t]
+\centering
+\caption{Configuraciones destacadas y efecto respecto de sus bases.}
+\label{tab:ablaciones}
+\small
+\begin{tabularx}{\linewidth}{lrrrrX}
+\toprule
+Configuración & Acc. & F1 & MAE & $R^2$ & Interpretación \\
+\midrule
+PCA 200 & 0,7981 & 0,7981 & 11,24 & 0,4456 &
+Mejor edad de E1, pero sin superar el accuracy de PCA base. \\
+MLP sin dropout & 0,8667 & 0,8665 & 11,63 & 0,3242 &
+Mejora moderada en ambas tareas frente a MLP base. \\
+CNN $\lambda=0{,}1$ & 0,8676 & 0,8669 & 8,78 & 0,6057 &
+Mejora edad a cambio de 1,24 puntos de accuracy. \\
+ResNet congelada $\lambda=0{,}1$ & 0,8277 & 0,8263 & 10,51 & 0,4839 &
+La ponderación no compensa la falta de adaptación del backbone. \\
+Fine-tuning, dos bloques & \best{0,9255} & \best{0,9255} & 6,62 & 0,7660 &
+Mejor clasificación y segundo mejor error de edad. \\
+Fine-tuning, $\lambda=0{,}1$ & 0,9165 & 0,9165 & \best{5,85} & \best{0,8232} &
+Mejor regresión y mejor compromiso multitarea. \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+Reducir $\lambda$ a 0,001 produjo resultados deficientes para edad: MAE 16,67
+en MLP y 13,54 en CNN. El learning rate $10^{-5}$ de fine-tuning mantuvo un
+accuracy alto (0,9086), pero obtuvo MAE 14,01 y $R^2=-0{,}0355$, indicio de
+subentrenamiento para la tarea de edad dentro de solo 10 épocas.
+
+\subsection{Modelo seleccionado}
+
+Se seleccionó \texttt{resnet\_finetuning\_lambda\_high} para el despliegue por
+su equilibrio: accuracy 0,9165, F1 0,9165, MAE 5,85, RMSE 8,20 y
+$R^2=0{,}8232$. La matriz de confusión fue
+\[
+\begin{bmatrix}
+1722 & 167\\
+130 & 1538
+\end{bmatrix},
+\]
+equivalente a 297 errores de género en 3.557 imágenes.
+
+\begin{figure*}[!t]
+    \centering
+    \begin{subfigure}{0.37\linewidth}
+        \includegraphics[width=\linewidth]{images/resnet_final_confusion_matrix.png}
+        \caption{Matriz de confusión.}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.60\linewidth}
+        \includegraphics[width=\linewidth]{images/resnet_final_age_predictions.png}
+        \caption{Edad real frente a predicha.}
+    \end{subfigure}
+    \caption{Diagnósticos del modelo seleccionado.}
+    \label{fig:diagnosticos}
+\end{figure*}
+
+\begin{figure*}[!t]
+    \centering
+    \includegraphics[width=\textwidth]{images/resnet_final_training_curves.png}
+    \caption{Pérdidas total, de género y de edad durante el entrenamiento del
+    modelo seleccionado.}
+    \label{fig:curvas}
+\end{figure*}
+
+La menor pérdida total de validación ocurrió en la época 4 (0,7507). Después,
+la pérdida de entrenamiento continuó descendiendo desde 0,6745 hasta 0,4304,
+mientras validación osciló y terminó en 0,7824. Este desacople evidencia
+sobreajuste moderado y justifica restaurar el checkpoint de la época 4.
+
+El MAE del modelo final aumentó con la edad: 3,75 años en 0--12; 6,72 en
+13--19; 4,71 en 20--39; 7,44 en 40--59; y 10,97 en 60+. La degradación en
+adultos mayores coincide con su menor representación y con la regresión de
+predicciones extremas hacia edades medias.
+
+\begin{figure*}[!t]
+    \centering
+    \begin{subfigure}{0.48\linewidth}
+        \includegraphics[width=\linewidth]{images/resnet_final_age_ranges.png}
+        \caption{MAE por rango etario.}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.48\linewidth}
+        \includegraphics[width=\linewidth]{images/global_computational_cost.png}
+        \caption{Tiempo y parámetros entrenables.}
+    \end{subfigure}
+    \caption{Error por grupo y costo computacional.}
+    \label{fig:rango-costo}
+\end{figure*}
+
+\todo{Agregar una cuadrícula con 2--3 aciertos y 2--3 errores visuales del
+conjunto de prueba. Las predicciones y nombres están en
+\texttt{predictions.csv}; deben recuperarse las imágenes originales de
+UTKFace. Ejemplos extremos identificados incluyen una imagen de 80 años
+predicha como 15,7 y una de 5 años predicha como 68,3.}
+
+\section{Discusión}
+
+Los resultados respaldan parcialmente la jerarquía esperada. La CNN simple
+mejoró la línea clásica porque conserva la estructura espacial de las
+imágenes. La MLP alcanzó mejor clasificación que E1, pero su regresión base
+fue peor pese a poseer 77 millones de parámetros. Esto muestra que el conteo
+de parámetros no sustituye un sesgo inductivo adecuado; además, la primera
+capa densa concentra la mayor parte del costo.
+
+La ResNet congelada tampoco superó a la CNN. Aunque sus características
+preentrenadas son informativas, entrenar solo 1.539 parámetros restringió su
+capacidad para adaptar rasgos de ImageNet al dominio de rostros alineados y a
+una tarea de regresión. El fine-tuning de los bloques finales cambió el
+resultado: descongelar más capas produjo el mejor género y mejoró edad, con
+un aumento acotado de parámetros y tiempo.
+
+El peso multitarea fue crítico. Una $\lambda$ baja permitió que la entropía
+cruzada dominara la optimización y deterioró especialmente edades altas. En
+ResNet fine-tuning, $\lambda=0{,}1$ mejoró simultáneamente MAE y accuracy
+respecto de la base. Esto sugiere que una señal de edad más fuerte favoreció
+una representación facial útil para ambas tareas, aunque esta conclusión se
+basa en una sola semilla y debe validarse con repeticiones.
+
+La distribución etaria explica parte de los errores. El 50,1\% de las imágenes
+pertenece al rango 20--39, mientras 13--19 representa solo 5,0\%. El modelo
+presentó mayor error en 60+, y los casos extremos muestran predicciones hacia
+el centro de la distribución. También existen incertidumbre de anotación,
+variación de iluminación, pose, oclusiones y edad aparente. En género, el
+desbalance es menor, pero las etiquetas binarias simplifican una característica
+humana compleja y pueden reforzar sesgos.
+
+Finalmente, los tiempos no siguen directamente los parámetros entrenables:
+ResNet congelada requirió un forward completo del backbone y tardó cerca de
+516 s, similar al fine-tuning. La batería acumuló aproximadamente 2,28 horas
+de entrenamiento, sin contar carga, evaluación y generación de artefactos.
+Por ello, el modelo final se eligió por desempeño conjunto y no solo por costo.
+
+\section{Conclusiones}
+
+Se implementó un flujo reproducible para clasificación de género y estimación
+de edad con UTKFace, comparando cinco estrategias y 20 configuraciones. La CNN
+simple fue una línea neuronal eficiente y superó a la MLP y a la ResNet
+completamente congelada. El principal salto provino del ajuste fino de
+ResNet18, que confirmó el valor de adaptar representaciones preentrenadas al
+dominio objetivo.
+
+La mejor clasificación se obtuvo descongelando dos bloques residuales
+(accuracy 0,9255), mientras la mejor regresión y el mejor compromiso global se
+lograron con $\lambda_{\mathrm{edad}}=0{,}1$ (MAE 5,85; $R^2=0{,}8232$).
+Las curvas revelaron sobreajuste después de la época 4, controlado mediante
+selección por validación.
+
+Las principales limitaciones son una sola semilla experimental, distribución
+etaria desigual, etiquetas binarias y ausencia de calibración de confianza.
+Como trabajo futuro se propone repetir con varias semillas, usar muestreo o
+pérdidas balanceadas por edad, aplicar early stopping, calibrar probabilidades,
+comparar arquitecturas modernas y reportar métricas de equidad por subgrupos.
+
+\section{Código y reproducibilidad}
+
+El proyecto separa configuración, datos, modelos, entrenamiento, evaluación,
+inferencia y frontend. El split se conserva en
+\texttt{artifacts/splits/utkface\_split.json}; cada experimento exporta
+checkpoint, historial, métricas y predicciones. Los reportes globales se
+generan en CSV y Markdown, evitando transcripción manual.
+
+\begin{table}[!t]
+\centering
+\caption{Ambiente y configuración reproducible.}
+\small
+\begin{tabular}{ll}
+\toprule
+Elemento & Valor \\
+\midrule
+Python & 3.10.20 \\
+PyTorch / torchvision & 2.12.1+cu130 / 0.27.1+cu130 \\
+GPU / CUDA & NVIDIA RTX A5000 / CUDA 13.0 \\
+Semilla & 42 \\
+Imagen / batch / épocas & $224\times224$ / 32 / 10 \\
+Optimizador & Adam \\
+Learning rate general & $10^{-3}$ \\
+Learning rate fine-tuning & $10^{-4}$ \\
+Weight decay & $10^{-4}$ \\
+$\lambda_{\mathrm{edad}}$ base & 0,01 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{lstlisting}[language=bash,caption={Comandos principales de reproducción.}]
+conda env create -f environment.yml
+conda activate lab03-dl-2026-01
+python -m pytest
+python main.py --ablations
+streamlit run Frontend/streamlit_main.py
+\end{lstlisting}
+
+La aplicación Streamlit permite cargar o capturar una imagen, detectar el
+rostro, aplicar el preprocesamiento de evaluación y mostrar género, confianza
+y edad. El modelo se cachea para evitar recargas y el despliegue se preparó
+para Streamlit Community Cloud. El código y las instrucciones están disponibles
+en \url{https://github.com/Menderin/Taller-3-Deep-Learning}. El prototipo se
+implementó con Streamlit \cite{streamlit}.
+
+\todo{Agregar aquí la URL pública definitiva de Streamlit una vez desplegada.}
+
+\appendix
+\subsection{Resultados Experimentales}
+
+\begin{table*}[!t]
+\centering
+\caption{Métricas de las 20 configuraciones en el conjunto de prueba.}
+\label{tab:resultados-completos}
+\scriptsize
+\begin{tabular}{llrrrrr}
+\toprule
+ID & Experimento & Acc. & F1 & MAE & RMSE & $R^2$ \\
+\midrule
+E1 & classical\_base & 0,8094 & 0,8087 & 11,68 & 15,08 & 0,4026 \\
+E1 & classical\_pca\_50 & 0,7852 & 0,7840 & 12,25 & 15,70 & 0,3522 \\
+E1 & classical\_pca\_200 & 0,7981 & 0,7981 & 11,24 & 14,52 & 0,4456 \\
+E2 & mlp\_base & 0,8580 & 0,8576 & 12,27 & 16,57 & 0,2786 \\
+E2 & mlp\_no\_dropout & 0,8667 & 0,8665 & 11,63 & 16,04 & 0,3242 \\
+E2 & mlp\_lambda\_low & 0,8403 & 0,8405 & 16,67 & 23,07 & -0,3985 \\
+E2 & mlp\_lambda\_high & 0,8386 & 0,8386 & 10,71 & 15,11 & 0,4000 \\
+E3 & cnn\_base & 0,8800 & 0,8798 & 9,43 & 12,98 & 0,5572 \\
+E3 & cnn\_no\_augmentation & 0,8766 & 0,8764 & 10,33 & 13,47 & 0,5235 \\
+E3 & cnn\_no\_dropout & 0,8687 & 0,8687 & 9,20 & 12,70 & 0,5762 \\
+E3 & cnn\_lambda\_low & 0,8766 & 0,8765 & 13,54 & 19,18 & 0,0330 \\
+E3 & cnn\_lambda\_high & 0,8676 & 0,8669 & 8,78 & 12,25 & 0,6057 \\
+E4 & resnet\_frozen\_base & 0,8395 & 0,8396 & 10,89 & 14,42 & 0,4538 \\
+E4 & resnet\_frozen\_no\_augmentation & 0,8322 & 0,8323 & 10,91 & 14,42 & 0,4533 \\
+E4 & resnet\_frozen\_lambda\_low & 0,8395 & 0,8396 & 11,34 & 15,12 & 0,3989 \\
+E4 & resnet\_frozen\_lambda\_high & 0,8277 & 0,8263 & 10,51 & 14,01 & 0,4839 \\
+E5 & resnet\_finetuning\_base & 0,9114 & 0,9113 & 7,32 & 10,09 & 0,7322 \\
+E5 & resnet\_finetuning\_unfreeze\_more & \best{0,9255} & \best{0,9255} & 6,62 & 9,44 & 0,7660 \\
+E5 & resnet\_finetuning\_lr\_low & 0,9086 & 0,9087 & 14,01 & 19,85 & -0,0355 \\
+E5 & resnet\_finetuning\_lambda\_high & 0,9165 & 0,9165 & \best{5,85} & \best{8,20} & \best{0,8232} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Rúbrica de autoevaluación}
+
+\begin{table}[!t]
+\centering
+\caption{Tabla de autoevaluación.}
+\label{tab:rubrica}
+\begin{tabular}{|p{5cm}|c|}
+\hline
+\textbf{Criterio} & \textbf{¿Cumplido?} \\
+\hline
+Introducción clara & Sí \\ \hline
+Marco teórico adecuado & Sí \\ \hline
+Metodología detallada & Sí \\ \hline
+Resultados completos y visuales & Parcial \\ \hline
+Discusión crítica & Sí \\ \hline
+Conclusiones reflexivas & Sí \\ \hline
+Calidad y estructura del código & Sí \\ \hline
+Presentación clara y sin errores & Pendiente \\ \hline
+Reproducibilidad & Sí \\ \hline
+Aportes adicionales & Sí \\ \hline
+\end{tabular}
+\end{table}
+
+\nocite{*}
+\bibliographystyle{IEEEtran}
+\bibliography{referencias}
+
+\end{document}

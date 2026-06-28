@@ -1,4 +1,4 @@
-"""Load the delivered CNN checkpoint and run PyTorch inference."""
+"""Load a trained multitask checkpoint and run PyTorch inference."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from PIL import Image
 
 from src.data.transforms import TransformFactory
 from src.models.cnn import MultiTaskCNN
+from src.models.resnet_todo import MultiTaskResNet
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,7 @@ class CNNPredictor:
 
     def __init__(
         self,
-        model: MultiTaskCNN,
+        model: torch.nn.Module,
         image_size: int,
         device: torch.device,
     ) -> None:
@@ -52,7 +53,8 @@ class CNNPredictor:
         path = Path(checkpoint_path)
         if not path.exists():
             raise FileNotFoundError(
-                f"No existe el checkpoint {path}. Entrene cnn_base antes de usar Streamlit."
+                f"No existe el checkpoint {path}. Configure CNN_CHECKPOINT "
+                "antes de usar Streamlit."
             )
 
         checkpoint: dict[str, Any] = torch.load(
@@ -60,11 +62,19 @@ class CNNPredictor:
             map_location=device,
             weights_only=True,
         )
-        if checkpoint.get("model_name") != "cnn":
-            raise ValueError("El checkpoint no corresponde a la CNN entregada.")
-
+        model_name = checkpoint.get("model_name")
         model_kwargs = checkpoint.get("model_kwargs", {})
-        model = MultiTaskCNN(**model_kwargs)
+        if model_name == "cnn":
+            model = MultiTaskCNN(**model_kwargs)
+        elif model_name in {"resnet_frozen", "resnet_finetuning"}:
+            model = MultiTaskResNet(
+                **model_kwargs,
+                pretrained=False,
+            )
+        else:
+            raise ValueError(
+                f"El checkpoint usa un modelo no soportado: {model_name!r}."
+            )
         model.load_state_dict(checkpoint["model_state_dict"])
         image_size = int(checkpoint.get("image_size", 224))
         return cls(model=model, image_size=image_size, device=device)

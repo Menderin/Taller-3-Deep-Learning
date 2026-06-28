@@ -14,6 +14,21 @@ artifacts/reports/*
 artifacts/plots/*
 artifacts/splits/*
 artifacts/experiments/*
+artifacts_server_*/
+
+# Fuentes de referencia internas, no parte de la entrega.
+informe/ejemplo_informe.ltx
+
+# Archivos auxiliares generados por LaTeX.
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
 
 # Keep generated directories in the repository
 !artifacts/checkpoints/.gitkeep

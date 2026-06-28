@@ -21,10 +21,15 @@ class FaceDetection:
 class FaceDetector:
     """Use OpenCV's Haar cascade for a small educational deployment."""
 
-    def __init__(self, cascade_path: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        cascade_path: str | Path | None = None,
+        crop_margin: float = 0.25,
+    ) -> None:
         if cascade_path is None:
             cascade_path = Path(cv2.data.haarcascades) / "haarcascade_frontalface_default.xml"
         self.cascade_path = Path(cascade_path)
+        self.crop_margin = crop_margin
         self.detector = cv2.CascadeClassifier(str(self.cascade_path))
         if self.detector.empty():
             raise RuntimeError(f"No se pudo cargar el detector facial: {self.cascade_path}")
@@ -45,7 +50,14 @@ class FaceDetector:
             return None
 
         x, y, width, height = max(faces, key=lambda face: int(face[2]) * int(face[3]))
-        box = (int(x), int(y), int(x + width), int(y + height))
+        center_x = x + width / 2
+        center_y = y + height / 2
+        side = max(width, height) * (1 + 2 * self.crop_margin)
+        left = max(0, int(center_x - side / 2))
+        top = max(0, int(center_y - side / 2))
+        right = min(rgb_image.width, int(center_x + side / 2))
+        bottom = min(rgb_image.height, int(center_y + side / 2))
+        box = (left, top, right, bottom)
         return FaceDetection(crop=rgb_image.crop(box), box=box)
 
     @staticmethod

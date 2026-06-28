@@ -11,7 +11,7 @@ from pathlib import Path
 from src.config import AppConfig
 from src.evaluation.reporter import ExperimentStatus, MetricsReporter
 from src.training.experiment_runner import ExperimentRunner, build_experiment_catalog
-from src.utils import collect_environment_info, resolve_device
+from src.utils import collect_environment_info, configure_cpu_threads, resolve_device
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -74,6 +74,7 @@ def print_results(results) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     config = AppConfig.from_env()
+    _thread_limiter = configure_cpu_threads(config.cpu_threads)
     config.ensure_artifact_directories()
     catalog = build_experiment_catalog(config)
 
@@ -96,6 +97,7 @@ def main(argv: list[str] | None = None) -> int:
 
     device = resolve_device(config.device)
     print(f"Device: {device}")
+    print(f"CPU threads: {config.cpu_threads}")
     print(f"Dataset: {config.dataset_dir}")
 
     reporter = MetricsReporter(config.reports_dir)

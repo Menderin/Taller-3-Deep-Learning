@@ -20,6 +20,7 @@ class MultiTaskResNet(BaseMultiTaskModel):
         self,
         freeze_backbone: bool = True,
         unfrozen_blocks: int = 0,
+        pretrained: bool = True,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -28,7 +29,8 @@ class MultiTaskResNet(BaseMultiTaskModel):
         if unfrozen_blocks < 0:
             raise ValueError("unfrozen_blocks no puede ser negativo.")
 
-        base = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+        weights = models.ResNet18_Weights.DEFAULT if pretrained else None
+        base = models.resnet18(weights=weights)
 
         if freeze_backbone:
             for param in base.parameters():

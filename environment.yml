@@ -19,3 +19,4 @@ dependencies:
       - scikit-learn>=1.4
       - pytest>=8.0
       - tqdm>=4.66
+      - threadpoolctl>=3.1

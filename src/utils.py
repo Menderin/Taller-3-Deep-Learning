@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import platform
 import random
 import sys
@@ -9,6 +10,29 @@ from typing import Any
 
 import numpy as np
 import torch
+
+
+def configure_cpu_threads(cpu_threads: int):
+    """Limit PyTorch and native numerical libraries for shared servers."""
+
+    for variable in (
+        "OMP_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+    ):
+        os.environ[variable] = str(cpu_threads)
+
+    torch.set_num_threads(cpu_threads)
+    try:
+        torch.set_num_interop_threads(max(1, min(cpu_threads, 4)))
+    except RuntimeError:
+        # PyTorch only permits changing inter-op threads before parallel work starts.
+        pass
+
+    from threadpoolctl import threadpool_limits
+
+    return threadpool_limits(limits=cpu_threads)
 
 
 def set_seed(seed: int) -> None:
