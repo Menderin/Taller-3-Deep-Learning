@@ -70,7 +70,7 @@ def run_app() -> None:
         unsafe_allow_html=True,
     )
 
-    tab_prediccion, tab_analytics = st.tabs(["Prediccion", "Desempeno de Modelos"])
+    tab_prediccion, tab_analytics = st.tabs(["Predicción", "Desempeño de Modelos"])
 
     with tab_prediccion:
         render_prediction_page(config, device)
