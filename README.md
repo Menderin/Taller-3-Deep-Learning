@@ -295,3 +295,20 @@ python3 -m pytest
 Las pruebas verifican el parser, las formas de salida de la CNN, las métricas y
 la generación de reportes. No reemplazan la evaluación experimental sobre
 UTKFace.
+
+## Ejemplos cualitativos para el informe
+
+Después de ejecutar los experimentos, la grilla de aciertos y errores del
+modelo final se genera sin reentrenar:
+
+```bash
+python scripts/generate_visual_examples.py \
+  --predictions artifacts/experiments/resnet_finetuning_lambda_high/predictions.csv \
+  --dataset /ruta/a/UTKFace \
+  --output informe/images/resnet_final_visual_examples.png \
+  --seed 42
+```
+
+El script selecciona dos aciertos, ambos sentidos de error de género y dos
+errores grandes de edad, priorizando ejemplos de 60 años o más. La salida es
+una figura 2x3 a 300 DPI.
