@@ -56,9 +56,12 @@ def run_app() -> None:
     
     experiment_name = config.cnn_checkpoint.parent.name
     model_labels = {
-        "resnet_finetuning_lambda_high": "ResNet18 fine-tuning",
+        "resnet_finetuning_lambda_high": (
+            "ResNet18 fine-tuning (&lambda;<sub>edad</sub> = 0,1)"
+        ),
         "resnet_finetuning_unfreeze_more": "ResNet18 fine-tuning ampliado",
         "cnn_base": "CNN multitarea",
+        "models": "ResNet18 fine-tuning (&lambda;<sub>edad</sub> = 0,1)",
     }
     model_label = model_labels.get(
         experiment_name,
