@@ -38,7 +38,7 @@ def run_app() -> None:
     """Render the upload/camera, face detection and prediction workflow."""
     st.set_page_config(
         page_title="UTKFace: Genero y Edad",
-        page_icon="📷",
+        page_icon="",
         layout="wide",
         initial_sidebar_state="collapsed"
     )

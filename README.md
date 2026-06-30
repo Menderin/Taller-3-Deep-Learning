@@ -1,89 +1,168 @@
-# Laboratorio 03: clasificación de género y regresión de edad
+# Laboratorio 03: clasificación de género y estimación de edad
 
-Este proyecto entrega una estructura educativa y modular para trabajar con
-UTKFace usando PyTorch. La implementación funcional corresponde a una CNN
-simple multitarea con dos salidas:
+Proyecto del Taller 3 de Deep Learning sobre UTKFace. Implementa un pipeline
+multitarea reproducible para:
 
-- Clasificación binaria de género según las etiquetas de UTKFace.
-- Regresión de edad.
+- clasificar la etiqueta binaria de género de UTKFace;
+- estimar la edad mediante regresión;
+- comparar modelos clásicos, MLP, CNN y transferencia de aprendizaje;
+- ejecutar ablaciones bajo un protocolo común;
+- desplegar el modelo seleccionado mediante Streamlit.
 
-La CNN incluye ejemplos de ablaciones y el proyecto contiene implementaciones
-base para las cinco estrategias del laboratorio, listas para validarse,
-ejecutarse y compararse con el mismo protocolo.
+Las etiquetas binarias de UTKFace representan anotaciones del dataset, no la
+identidad de género de una persona. El sistema es educativo, puede reproducir
+sesgos demográficos y no debe utilizarse para tomar decisiones sobre personas.
 
-> Las etiquetas binarias de UTKFace describen la anotación del dataset y no la
-> identidad de género de una persona. El modelo puede reproducir sesgos y no
-> debe usarse para tomar decisiones sobre personas.
+## Estado del proyecto
 
-## Estructura del proyecto
+- 5 estrategias implementadas.
+- 20 experimentos completados: 5 configuraciones base y 15 ablaciones.
+- 23.705 imágenes válidas.
+- Split fijo: 16.593 entrenamiento, 3.555 validación y 3.557 prueba.
+- Semilla: 42.
+- 11 pruebas automatizadas aprobadas.
+- Aplicación Streamlit funcional y preparada para Community Cloud.
+- Informe IEEE y figuras disponibles en `informe/`.
+
+Resultados principales:
+
+| Criterio | Experimento | Resultado |
+|---|---|---:|
+| Mejor accuracy de género | `resnet_finetuning_unfreeze_more` | 0,9255 |
+| Mejor F1 de género | `resnet_finetuning_unfreeze_more` | 0,9255 |
+| Mejor MAE de edad | `resnet_finetuning_lambda_high` | 5,8480 años |
+| Mejor RMSE de edad | `resnet_finetuning_lambda_high` | 8,2030 años |
+| Mejor R² de edad | `resnet_finetuning_lambda_high` | 0,8232 |
+
+La aplicación despliega `resnet_finetuning_lambda_high`, seleccionado por su
+equilibrio entre ambas tareas. Su accuracy de género es 0,9165 y su mejor
+checkpoint corresponde a la época 4.
+
+## Estructura
 
 ```text
 .
 ├── .env.example
 ├── environment.yml
-├── README.md
 ├── requirements.txt
 ├── main.py
 ├── Frontend/
-│   ├── __init__.py
+│   ├── streamlit_main.py
 │   ├── streamlit_app.py
-│   └── streamlit_main.py
+│   ├── ui_styles.py
+│   ├── requirements.txt
+│   ├── models/
+│   │   └── best_model.pt
+│   └── assets/
+│       ├── fondo.png
+│       ├── github-logo.png
+│       └── results/
 ├── src/
 │   ├── config.py
 │   ├── utils.py
 │   ├── data/
-│   │   ├── parser.py
-│   │   ├── dataset.py
-│   │   ├── datamodule.py
-│   │   └── transforms.py
-│   ├── models/
-│   │   ├── base.py
-│   │   ├── cnn.py
-│   │   ├── mlp_todo.py
-│   │   └── resnet_todo.py
 │   ├── baselines/
-│   │   └── classical_todo.py
+│   ├── models/
 │   ├── training/
-│   │   ├── losses.py
-│   │   ├── trainer.py
-│   │   └── experiment_runner.py
 │   ├── evaluation/
-│   │   ├── metrics.py
-│   │   ├── plots.py
-│   │   └── reporter.py
 │   └── inference/
-│       ├── face_detector.py
-│       └── predictor.py
+├── scripts/
+│   └── generate_visual_examples.py
 ├── tests/
-└── artifacts/
-    ├── checkpoints/
-    ├── reports/
-    ├── plots/
-    └── splits/
+├── artifacts/
+│   ├── checkpoints/
+│   ├── experiments/
+│   ├── plots/
+│   ├── reports/
+│   └── splits/
+├── informe/
+│   ├── boceto_informe3.ltx
+│   ├── referencias.bib
+│   └── images/
+└── docs/
+    └── Laboratorio_03__Redes_convolucionales_final.pdf
 ```
 
-## Componentes principales
+Los archivos `mlp_todo.py`, `resnet_todo.py` y `classical_todo.py` conservan
+el nombre de la plantilla educativa, pero contienen implementaciones
+funcionales.
 
-| Componente | Responsabilidad |
-|---|---|
-| `main.py` | Orquestar entrenamiento, evaluación y reportes. |
-| `Frontend/streamlit_main.py` | Orquestar la aplicación de inferencia. |
-| `Frontend/streamlit_app.py` | Renderizar la interfaz web de Streamlit. |
-| `src/config.py` | Leer `.env` y centralizar hiperparámetros. |
-| `src/data/` | Leer UTKFace, extraer etiquetas y crear particiones reproducibles. |
-| `src/models/cnn.py` | Implementar la CNN multitarea entregada. |
-| `src/training/` | Ejecutar el ciclo manual de entrenamiento con PyTorch. |
-| `src/evaluation/` | Calcular métricas, generar gráficos y exportar reportes. |
-| `src/inference/` | Detectar rostros y ejecutar checkpoints entrenados. |
+## Estrategias experimentales
 
-No se usa PyTorch Lightning. El ciclo de entrenamiento muestra directamente
-`zero_grad`, `backward` y `step` para que el flujo de PyTorch sea observable.
-La única excepción es E1, porque PCA y los estimadores clásicos se implementan
-con scikit-learn.
+| ID | Estrategia | Configuraciones |
+|---|---|---:|
+| E1 | PCA + GaussianNB/Ridge | 3 |
+| E2 | MLP multitarea | 4 |
+| E3 | CNN simple multitarea | 5 |
+| E4 | ResNet18 congelada | 4 |
+| E5 | ResNet18 con fine-tuning | 4 |
 
-## Preparación del ambiente
+Catálogo completo:
 
-Se recomienda usar Conda para crear el ambiente completo desde un solo archivo:
+```bash
+python main.py --list
+```
+
+Las ablaciones estudian componentes PCA, dropout, aumentación, ponderación de
+edad, learning rate y cantidad de bloques residuales descongelados.
+
+## Dataset y preprocesamiento
+
+Se utiliza UTKFace `Aligned & Cropped Faces`. Los nombres siguen el formato:
+
+```text
+edad_genero_raza_fecha.jpg
+```
+
+El parser extrae edad y género, valida los nombres e ignora entradas
+inválidas. El código interpreta:
+
+```text
+edad   -> valor continuo
+género -> 0 o 1, según la anotación de UTKFace
+```
+
+Preprocesamiento neuronal:
+
+- redimensionamiento a 224x224;
+- conversión a tensor RGB;
+- normalización con estadísticas de ImageNet;
+- volteo horizontal y `ColorJitter` leve solo en entrenamiento.
+
+Validación, prueba e inferencia usan transformaciones deterministas. El
+baseline clásico convierte las imágenes a escala de grises y 64x64 antes de
+PCA.
+
+## Pérdida y métricas
+
+Los modelos neuronales comparten representación y utilizan dos cabezas:
+
+```text
+CrossEntropyLoss(género)
+    + lambda_age * SmoothL1Loss(edad)
+```
+
+Métricas de género:
+
+- accuracy;
+- precisión, recall y F1 ponderados;
+- matriz de confusión.
+
+Métricas de edad:
+
+- MAE;
+- RMSE;
+- R²;
+- MAE y soporte por rango etario;
+- edad real frente a predicha;
+- distribución de residuos.
+
+También se registran tiempo de entrenamiento, parámetros entrenables,
+historial por época, predicciones individuales y checkpoint seleccionado.
+
+## Instalación
+
+### Conda
 
 ```bash
 conda env create -f environment.yml
@@ -91,215 +170,120 @@ conda activate lab03-dl-2026-01
 cp .env.example .env
 ```
 
-Para actualizar un ambiente existente después de modificar `environment.yml`:
+Para actualizar un entorno existente:
 
 ```bash
 conda env update -f environment.yml --prune
 ```
 
-También es posible usar un ambiente virtual estándar con Python 3.10 o
-superior:
+### Entorno virtual
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install -r requirements.txt
+python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Descarga la versión **Aligned & Cropped Faces** de UTKFace y configura la ruta
-en `.env`:
+En Windows, la activación depende de la terminal utilizada.
+
+## Configuración
+
+Configura `.env` antes de entrenar:
 
 ```dotenv
 UTKFACE_DIR=/ruta/a/UTKFace
+ARTIFACTS_DIR=artifacts
+CNN_CHECKPOINT=Frontend/models/best_model.pt
+
+SEED=42
+IMAGE_SIZE=224
+BATCH_SIZE=32
+EPOCHS=10
+LEARNING_RATE=0.001
+WEIGHT_DECAY=0.0001
+LAMBDA_AGE=0.01
+NUM_WORKERS=0
+CPU_THREADS=4
+MAX_IMAGES=0
+DEVICE=auto
 ```
 
-La carpeta debe contener archivos con nombres como:
+`CPU_THREADS` limita PyTorch, OpenMP, MKL, OpenBLAS y NumExpr para evitar
+saturación en servidores compartidos. `MAX_IMAGES` permite ejecutar pruebas
+rápidas con un subconjunto; el valor 0 usa todas las imágenes.
 
-```text
-25_1_2_20170116174525125.jpg
-```
+## Ejecución experimental
 
-El parser interpreta el primer valor como edad y el segundo como género.
-
-## Flujo de trabajo
-
-1. `AppConfig` carga la ruta del dataset y los hiperparámetros desde `.env`.
-2. `UTKFaceDataModule` descubre imágenes válidas y crea una partición
-   reproducible de entrenamiento, validación y prueba.
-3. Las transformaciones aleatorias se aplican solamente en entrenamiento.
-4. `ExperimentRunner` construye la CNN, la pérdida multitarea y el optimizador.
-5. `MultiTaskTrainer` entrena con PyTorch y guarda el mejor checkpoint según la
-   pérdida de validación.
-6. `MultiTaskEvaluator` calcula métricas separadas para género y edad.
-7. `MetricsReporter` registra todos los experimentos, incluidos los pendientes.
-
-La pérdida total es:
-
-```text
-CrossEntropyLoss(género) + lambda_age * SmoothL1Loss(edad)
-```
-
-## Ejecución
-
-Mostrar el catálogo completo:
+Ejecutar la CNN base:
 
 ```bash
-python3 main.py --list
+python main.py --experiment cnn_base
 ```
 
-Entrenar la CNN base:
+Seleccionar varios experimentos:
 
 ```bash
-python3 main.py --experiment cnn_base
-```
-
-Ejecutar las configuraciones base y las ablaciones implementadas de todas las
-estrategias:
-
-```bash
-python3 main.py --ablations
-```
-
-Ejecutar todos los experimentos actualmente implementados:
-
-```bash
-python3 main.py --all
-```
-
-También se pueden seleccionar varios experimentos:
-
-```bash
-python3 main.py \
+python main.py \
   --experiment cnn_base \
   --experiment cnn_no_dropout
 ```
 
-## Estrategias y ablaciones
+Ejecutar las 20 configuraciones implementadas:
 
-| ID | Estrategia | Estado inicial |
-|---|---|---|
-| E1 | PCA + modelos clásicos | `IMPLEMENTADO` |
-| E2 | MLP multitarea | `IMPLEMENTADO` |
-| E3 | CNN simple multitarea | `IMPLEMENTADO` |
-| E4 | ResNet18 congelada | `IMPLEMENTADO` |
-| E5 | ResNet18 fine-tuning | `IMPLEMENTADO` |
+```bash
+python main.py --ablations
+```
 
-En esta estructura, E6 no es un modelo independiente. E6 representa el
-análisis transversal de ablaciones que debe aplicarse a E1, E2, E3, E4 y E5.
+`--all` también ejecuta todos los experimentos implementados:
 
-La CNN incluye estas variantes funcionales:
+```bash
+python main.py --all
+```
 
-| Experimento | Componente modificado |
-|---|---|
-| `cnn_base` | Ninguno |
-| `cnn_no_augmentation` | Elimina aumentación de datos |
-| `cnn_no_dropout` | Usa `dropout=0.0` |
-| `cnn_lambda_low` | Reduce `lambda_age` |
-| `cnn_lambda_high` | Aumenta `lambda_age` |
+El entrenamiento muestra progreso por época y batch. Cada modelo neuronal
+guarda el checkpoint con menor pérdida total de validación.
 
-### Regla obligatoria para los alumnos
+## Artefactos
 
-**Las ablaciones deben probarse en todos los experimentos implementados, no
-solo en la CNN entregada.**
-
-Para cada estrategia E1 a E5 se debe:
-
-1. Ejecutar una configuración base.
-2. Seleccionar al menos dos componentes relevantes para analizar.
-3. Modificar un solo componente por ablación.
-4. Mantener la misma semilla, partición y protocolo de evaluación.
-5. Reportar resultados favorables y desfavorables.
-6. Discutir el efecto sobre género, edad, costo computacional y sobreajuste.
-
-El catálogo deja ejemplos de ablaciones pendientes para E1, E2, E4 y E5.
-
-## Reportes y métricas
-
-Cada ejecución genera una fila para todos los modelos y algoritmos del
-catálogo. Los estados posibles son:
-
-- `COMPLETADO`: se ejecutó y tiene métricas.
-- `NO_IMPLEMENTADO`: todavía debe ser completado por los alumnos.
-- `NO_EJECUTADO`: existe, pero no fue seleccionado en esta ejecución.
-- `ERROR`: se intentó ejecutar, pero ocurrió un problema.
-
-Los reportes principales se guardan en:
+Los archivos generados se guardan bajo `ARTIFACTS_DIR`:
 
 ```text
-artifacts/reports/
-├── all_experiments_comparison.csv
-├── all_experiments_comparison.md
-├── e1_classical_ablations.csv
-├── e2_mlp_ablations.csv
-├── e3_cnn_ablations.csv
-├── e4_resnet_frozen_ablations.csv
-├── e5_resnet_finetuning_ablations.csv
-└── environment.json
+artifacts/
+├── checkpoints/<experimento>/
+├── experiments/<experimento>/
+│   ├── result.json
+│   ├── evaluation.json
+│   ├── predictions.csv
+│   ├── training_history.csv
+│   └── training_history.json
+├── plots/
+├── reports/
+└── splits/utkface_split.json
 ```
 
-Las métricas de género son accuracy, precision, recall, F1 y matriz de
-confusión. Las métricas de edad son MAE, RMSE, R² y MAE por rango etario.
-También se registran parámetros entrenables, tiempo de entrenamiento, curvas
-de pérdida y gráfico de edad real versus predicha.
+Los experimentos clásicos no tienen historial por épocas. Los reportes
+principales incluyen:
 
-Cada experimento completado conserva además sus predicciones individuales,
-métricas, matriz de confusión e historial de entrenamiento en
-`artifacts/experiments/<nombre>/`. Los gráficos incluyen residuos y MAE por
-rango etario, comparaciones globales, compromiso entre tareas y costo
-computacional. `artifacts/reports/run_progress.json` se actualiza después de
-cada experimento para no perder los resultados ya terminados si la ejecución
-se interrumpe.
-
-## Aplicación Streamlit
-
-Primero entrena `cnn_base` o configura `CNN_CHECKPOINT` en `.env` para apuntar
-a otro checkpoint de la CNN:
-
-```bash
-python3 main.py --experiment cnn_base
-streamlit run Frontend/streamlit_main.py
+```text
+all_experiments_comparison.csv
+all_experiments_comparison.md
+e1_classical_ablations.*
+e2_mlp_ablations.*
+e3_cnn_ablations.*
+e4_resnet_frozen_ablations.*
+e5_resnet_finetuning_ablations.*
+environment.json
+run_metadata.json
+run_progress.json
 ```
 
-La aplicación permite subir una imagen o capturarla con la cámara, detecta la
-cara más grande mediante OpenCV, aplica el preprocesamiento de evaluación y
-muestra género, confianza y edad estimada.
+`run_progress.json` se actualiza después de cada experimento para conservar los
+resultados ya completados ante una interrupción.
 
-### Despliegue en Streamlit Community Cloud
+## Ejemplos cualitativos
 
-La carpeta `Frontend/` contiene el checkpoint seleccionado, los recursos
-visuales y un archivo de dependencias mínimo para desplegar la aplicación sin
-el dataset ni los artefactos completos de entrenamiento.
-
-1. Publicar el repositorio en GitHub.
-2. Crear una aplicación en `https://share.streamlit.io`.
-3. Seleccionar este repositorio y la rama principal.
-4. Usar `Frontend/streamlit_main.py` como entrypoint.
-5. En opciones avanzadas, seleccionar Python 3.10.
-6. Desplegar. No se requieren secretos para esta versión.
-
-## Trabajo pendiente para los alumnos
-
-- Validar el ambiente y la ruta real de UTKFace en `.env`.
-- Ejecutar y analizar ablaciones para **cada** estrategia.
-- Comparar métricas, curvas, errores visuales y costo computacional.
-- Discutir sesgos, limitaciones del dataset y uso responsable del modelo.
-- Redactar el informe final con tablas, gráficos y conclusiones.
-
-## Pruebas
-
-```bash
-python3 -m pytest
-```
-
-Las pruebas verifican el parser, las formas de salida de la CNN, las métricas y
-la generación de reportes. No reemplazan la evaluación experimental sobre
-UTKFace.
-
-## Ejemplos cualitativos para el informe
-
-Después de ejecutar los experimentos, la grilla de aciertos y errores del
-modelo final se genera sin reentrenar:
+La figura de aciertos y errores se genera sin reentrenar:
 
 ```bash
 python scripts/generate_visual_examples.py \
@@ -309,6 +293,93 @@ python scripts/generate_visual_examples.py \
   --seed 42
 ```
 
-El script selecciona dos aciertos, ambos sentidos de error de género y dos
-errores grandes de edad, priorizando ejemplos de 60 años o más. La salida es
-una figura 2x3 a 300 DPI.
+El script produce una grilla 2x3 a 300 DPI con:
+
+- un acierto por género con error de edad bajo;
+- ambos sentidos de error de género;
+- dos errores grandes de edad, priorizando personas de 60 años o más.
+
+## Aplicación Streamlit
+
+La aplicación local utiliza el checkpoint final incluido en el repositorio.
+No necesita UTKFace ni volver a entrenar:
+
+```bash
+streamlit run Frontend/streamlit_main.py
+```
+
+También es válido:
+
+```bash
+streamlit run Frontend/streamlit_app.py
+```
+
+Funciones principales:
+
+- carga de archivo y captura por cámara;
+- detección y recorte del rostro;
+- preprocesamiento equivalente al conjunto de prueba;
+- predicción de género, confianza estimada y edad;
+- comparación resumida de los experimentos;
+- créditos y enlace al repositorio.
+
+### Streamlit Community Cloud
+
+Configuración recomendada:
+
+```text
+Repository: Menderin/Taller-3-Deep-Learning
+Branch: main
+Main file path: Frontend/streamlit_main.py
+Python: 3.10
+Secrets: ninguno
+```
+
+`Frontend/requirements.txt` contiene únicamente las dependencias necesarias
+para la aplicación. El checkpoint final y los gráficos del frontend están
+versionados, por lo que el despliegue no depende de `.env` ni de artefactos
+externos.
+
+## Informe
+
+El informe se encuentra en:
+
+```text
+informe/boceto_informe3.ltx
+informe/referencias.bib
+informe/images/
+```
+
+Para Overleaf, sube el contenido de `informe/` como raíz del proyecto y
+selecciona `boceto_informe3.ltx` como documento principal.
+
+## Pruebas
+
+```bash
+python -m pytest
+```
+
+La suite contiene 11 pruebas para:
+
+- parser de UTKFace;
+- formas de salida de la CNN;
+- catálogo experimental;
+- métricas multitarea;
+- reportes y persistencia de artefactos;
+- selección de ejemplos cualitativos.
+
+## Reproducibilidad
+
+La ejecución completa registrada utilizó:
+
+```text
+Python: 3.10.20
+PyTorch: 2.12.1+cu130
+torchvision: 0.27.1+cu130
+CUDA: 13.0
+GPU: NVIDIA RTX A5000
+Seed: 42
+```
+
+El repositorio no incluye el dataset, `.env`, agentes internos ni los
+artefactos completos descargados desde el servidor.
